@@ -44,6 +44,19 @@ ROOMS_UP = [("ch1-1", [140, 90], 3, "r1"), ("ch2-1", [120, 90, 90], 3, "r2"),
             ("ch3-1", [140], 2, "r3"), ("ch4-1", [160], 2, "r4")]
 ROOM_DOWN = ("salon-1", [140], 2, "r5")
 
+# Données structurées (schema.org VacationRental)
+# Point approximatif (centre de Cosnac), pas l'emplacement exact de la maison.
+GEO = (45.13471, 1.58461)
+BED_TYPES = {90: "Single", 120: "SemiDouble", 140: "Double", 160: "Queen"}
+
+
+def beds_jsonld():
+    counts = {}
+    for r in ROOMS_UP + [ROOM_DOWN]:
+        for w in r[1]:
+            counts[BED_TYPES[w]] = counts.get(BED_TYPES[w], 0) + 1
+    return [{"@type": "BedDetails", "typeOfBed": k, "numberOfBeds": n} for k, n in counts.items()]
+
 T = {
 "fr": {
   "html_lang": "fr", "locale": "fr_FR",
@@ -322,11 +335,24 @@ def page(lang):
     faq = "".join(f"<details><summary>{E(q)}</summary><p>{E(a)}</p></details>" for q, a in t["faq"])
     jsonld = {
         "@context": "https://schema.org", "@type": "VacationRental", "name": "Maison d'Ayras",
-        "description": t["desc"], "url": f"{DOMAIN}/{PATHS[lang]}", "image": f"{DOMAIN}/img/exterieur-1.webp",
+        # Identifiant stable, identique dans les trois langues (exigé par Google)
+        "identifier": "maison-ayras",
+        "additionalType": "House",
+        "description": t["desc"], "url": f"{DOMAIN}/{PATHS[lang]}",
+        # Google exige au moins 8 photos, dont chambre, salle de bain et pièce commune
+        "image": [f"{DOMAIN}/img/{p[0]}.webp" for p in PHOTOS],
+        "geo": {"@type": "GeoCoordinates", "latitude": GEO[0], "longitude": GEO[1]},
         "address": {"@type": "PostalAddress", "addressLocality": "Cosnac", "postalCode": "19360", "addressRegion": "Corrèze", "addressCountry": "FR"},
-        "containsPlace": {"@type": "Accommodation", "numberOfBedrooms": 4, "numberOfBathroomsTotal": 3,
-                          "occupancy": {"@type": "QuantitativeValue", "maxValue": 12},
-                          "amenityFeature": [{"@type": "LocationFeatureSpecification", "name": n, "value": True} for n in ("Pool", "Wifi", "Free parking", "Garden")]},
+        "checkinTime": "17:00:00+02:00", "checkoutTime": "10:00:00+02:00",
+        "knowsLanguage": ["fr", "en"],
+        "containsPlace": {"@type": "Accommodation", "additionalType": "EntirePlace",
+                          "numberOfBedrooms": 4, "numberOfBathroomsTotal": 3,
+                          "occupancy": {"@type": "QuantitativeValue", "value": total},
+                          "floorSize": {"@type": "QuantitativeValue", "value": 220, "unitCode": "MTK"},
+                          "bed": beds_jsonld(),
+                          "amenityFeature": [{"@type": "LocationFeatureSpecification", "name": n, "value": True}
+                                             for n in ("pool", "wifi", "tv", "kitchen", "ovenStove", "microwave", "washerDryer", "selfCheckinCheckout")]
+                                            + [{"@type": "LocationFeatureSpecification", "name": "parkingType", "value": "Free"}]},
     }
     ext = 'rel="noopener" target="_blank"'
     return f'''<!DOCTYPE html>
